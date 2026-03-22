@@ -1,7 +1,7 @@
 """
 Frontend Agent
 ==============
-Implements Next.js pages, React components, and UI based on the product
+Implements pages, React components, and UI based on the product
 plan and backend APIs built in this iteration.
 """
 
@@ -10,34 +10,58 @@ from agents.base_agent import BaseAgent
 from context.context_store import ContextStore
 
 
-SYSTEM_PROMPT = """
-You are a senior frontend engineer specialising in Next.js 14+ (App Router),
-React, TypeScript, and Tailwind CSS.
+def _build_system_prompt(context: ContextStore) -> str:
+    cfg = context.get("project_config") or {}
+    project = context.get("project") or {}
+    frontend_cfg = cfg.get("frontend", {})
+    domain_cfg = cfg.get("domain", {})
 
-You are building the UI for a rental marketplace. Your job each iteration:
+    project_name = project.get("name", "the project")
+    description = project.get("description", "")
+    stack = project.get("stack", "Next.js, TypeScript, Tailwind CSS")
+    ui_library = frontend_cfg.get("ui_library", "Tailwind CSS")
+    component_lib = frontend_cfg.get("component_library", "none")
+    data_fetching = frontend_cfg.get("data_fetching", "server-components")
+    entities = ", ".join(domain_cfg.get("entities", []))
+    key_actions = ", ".join(domain_cfg.get("key_actions", []))
+
+    component_lib_note = (
+        f"- Use {component_lib} as the component library where appropriate."
+        if component_lib and component_lib != "none"
+        else "- Use the project's existing component patterns."
+    )
+    fetching_note = (
+        "- Use React Server Components for initial data; 'use client' only for event handlers, hooks, or browser APIs."
+        if data_fetching == "server-components"
+        else f"- Use {data_fetching} for data fetching, matching the existing project pattern."
+    )
+
+    return f"""
+You are a senior frontend engineer. You are building the UI for {project_name}.
+{f'Project: {description}' if description else ''}
+Stack: {stack}
+
+Your job each iteration:
 1. Review the planned features and UX notes from the Product agent.
 2. Review existing components and pages.
 3. Write production-quality React components and Next.js pages.
 
 Rules:
-- Use Next.js App Router (app/ directory), TypeScript, Tailwind CSS.
+- Use Next.js App Router (app/ directory), TypeScript, {ui_library}.
 - Write complete components — no placeholder TODOs.
-- Use React Server Components where appropriate; 'use client' only when needed
-  (event handlers, hooks, browser APIs).
+- {fetching_note}
 - Handle loading and error states.
 - Make components accessible (proper aria labels, semantic HTML).
-- Use the project's existing component library / design patterns where visible.
+- {component_lib_note}
 - For forms: use react-hook-form + Zod for validation if the project uses it,
   otherwise use controlled components.
-- For data fetching: use server components for initial data, SWR or React Query
-  for client-side mutations if already in the project.
-- Think rental marketplace UI: listing cards, booking calendars, search bars,
-  filters, image galleries, price displays, availability pickers, review stars,
-  host/guest profile cards, message threads.
+{f'- Core domain entities to display: {entities}' if entities else ''}
+{f'- Key user actions to support: {key_actions}' if key_actions else ''}
 
 Output format: a JSON object where keys are file paths (relative to repo root)
 and values are the complete file content as strings.
-"""
+""".strip()
+
 
 
 class FrontendAgent(BaseAgent):
@@ -86,7 +110,7 @@ Aim for 4–8 files per iteration. Write complete, production-quality TypeScript
 Focus on the features planned — don't rewrite existing pages.
 """
 
-        files = self.call_json(SYSTEM_PROMPT, user_prompt, max_tokens=4096)
+        files = self.call_json(_build_system_prompt(context), user_prompt, max_tokens=4096)
 
         context.add_decision("Frontend", f"Built {len(files)} UI files: {', '.join(list(files.keys())[:5])}")
 
@@ -126,7 +150,7 @@ updated file content — the same format as the original implementation.
 Only include files that required changes; unchanged files can be omitted.
 """
 
-        revised = self.call_json(SYSTEM_PROMPT, user_prompt, max_tokens=4096)
+        revised = self.call_json(_build_system_prompt(context), user_prompt, max_tokens=4096)
 
         context.add_decision(
             "Frontend",

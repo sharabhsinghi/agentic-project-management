@@ -10,9 +10,33 @@ from agents.base_agent import BaseAgent
 from context.context_store import ContextStore
 
 
-SYSTEM_PROMPT = """
-You are a senior database architect specialising in PostgreSQL and Prisma ORM.
-You are building the database for a Next.js rental marketplace.
+def _build_system_prompt(context: ContextStore) -> str:
+    cfg = context.get("project_config") or {}
+    project = context.get("project") or {}
+    backend_cfg = cfg.get("backend", {})
+    domain_cfg = cfg.get("domain", {})
+
+    project_name = project.get("name", "the project")
+    description = project.get("description", "")
+    db_client = backend_cfg.get("db_client", "postgresql")
+    entities = ", ".join(domain_cfg.get("entities", []))
+    constraints = "; ".join(domain_cfg.get("constraints", []))
+
+    supabase_note = (
+        "- Include Supabase RLS policies where appropriate."
+        if "supabase" in db_client.lower()
+        else ""
+    )
+    prisma_note = (
+        "- Output both SQL migration and Prisma schema model blocks."
+        if "prisma" in db_client.lower() or db_client == "supabase"
+        else "- Output SQL migration only; set prisma_models to empty string."
+    )
+
+    return f"""
+You are a senior database architect specialising in PostgreSQL.
+You are designing the database for {project_name}.
+{f'Project: {description}' if description else ''}
 
 Your job each iteration:
 1. Review the features planned for this iteration.
@@ -24,12 +48,15 @@ Rules:
 - Always use UUIDs for primary keys (gen_random_uuid()).
 - Always include created_at and updated_at timestamps.
 - Use proper foreign keys with ON DELETE behaviour.
-- Add indexes on columns used for filtering/search.
+- Add indexes on columns used for filtering or searching.
 - Never drop existing columns — add new ones or alter carefully.
-- Think about a rental marketplace: users, listings, bookings, payments, reviews, 
-  availability, images, amenities, messages.
 - Write production-quality SQL — not throwaway scaffolding.
-"""
+{f'- Core domain entities: {entities}' if entities else ''}
+{f'- Constraints to enforce at DB level: {constraints}' if constraints else ''}
+{supabase_note}
+{prisma_note}
+""".strip()
+
 
 
 class SchemaAgent(BaseAgent):
@@ -78,7 +105,7 @@ The sql_migration should be a complete, runnable SQL file with:
 The prisma_models should be valid Prisma schema syntax for the new/updated models only.
 """
 
-        result = self.call_json(SYSTEM_PROMPT, user_prompt, max_tokens=4096)
+        result = self.call_json(_build_system_prompt(context), user_prompt, max_tokens=4096)
 
         # Update context with schema decisions
         context.update_schema({

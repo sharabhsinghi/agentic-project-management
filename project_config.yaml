@@ -1,0 +1,68 @@
+# ─────────────────────────────────────────────────────────────
+#  Agent System — Project Configuration
+#  Fill this in once before running --init.
+# ─────────────────────────────────────────────────────────────
+
+project:
+  # Short name for your project (used in reports and context)
+  name: "My Project"
+
+  # One or two sentences: what does this app do, who uses it?
+  description: "A web application that ..."
+
+  # Comma-separated list of the main technologies in your repo
+  # e.g. "Next.js 14, TypeScript, Supabase, Tailwind CSS, Prisma"
+  stack: "Next.js 14, TypeScript, PostgreSQL, Tailwind CSS"
+
+  # The primary user roles in this app (for user stories)
+  # e.g. ["guest", "host"] or ["buyer", "seller"] or ["admin", "customer"]
+  user_roles:
+    - "user"
+    - "admin"
+
+domain:
+  # Describe the core domain concepts agents should know about.
+  # These feed directly into product planning, schema design, and code generation.
+  # Be specific — list the main entities/nouns and the key actions/verbs.
+  #
+  # Example for a marketplace:
+  #   entities: ["listing", "booking", "host", "guest", "review", "payment"]
+  #   key_actions: ["search listings", "make a booking", "leave a review", "process payment"]
+  #
+  # Example for a SaaS dashboard:
+  #   entities: ["workspace", "project", "task", "member", "report"]
+  #   key_actions: ["create project", "assign task", "invite member", "export report"]
+
+  entities:
+    - "user"
+    - "item"
+
+  key_actions:
+    - "create item"
+    - "update item"
+    - "delete item"
+
+  # Any domain-specific rules or constraints agents must always respect
+  # e.g. "A booking cannot overlap another booking for the same listing"
+  constraints:
+    - "Users can only modify their own data"
+
+backend:
+  # Database client in use: "supabase" | "prisma" | "drizzle" | "raw-sql" | "other"
+  db_client: "supabase"
+
+  # Auth mechanism: "supabase-auth" | "next-auth" | "clerk" | "custom" | "none"
+  auth: "supabase-auth"
+
+  # API style: "app-router" (Next.js route handlers) | "pages-router" | "express" | "other"
+  api_style: "app-router"
+
+frontend:
+  # UI framework/library in use
+  ui_library: "Tailwind CSS"
+
+  # Component library, if any: "shadcn/ui" | "chakra-ui" | "mui" | "none"
+  component_library: "none"
+
+  # Data fetching preference: "server-components" | "swr" | "react-query" | "mixed"
+  data_fetching: "server-components"

@@ -10,10 +10,24 @@ from context.context_store import ContextStore
 from tools.repo_tools import RepoTools
 
 
-SYSTEM_PROMPT = """
-You are a senior product manager specialising in rental marketplace apps (think Airbnb, 
-VRBO, or equipment rental platforms). You are part of an AI agent team building a 
-Next.js + PostgreSQL rental marketplace.
+def _build_system_prompt(context: ContextStore) -> str:
+    cfg = context.get("project_config") or {}
+    project = context.get("project") or {}
+    domain_cfg = cfg.get("domain", {})
+    project_cfg = cfg.get("project", {})
+
+    project_name = project.get("name", "the project")
+    description = project.get("description", "")
+    stack = project.get("stack", "")
+    user_roles = ", ".join(project_cfg.get("user_roles", ["user"]))
+    entities = ", ".join(domain_cfg.get("entities", []))
+    key_actions = ", ".join(domain_cfg.get("key_actions", []))
+    constraints = "; ".join(domain_cfg.get("constraints", []))
+
+    return f"""
+You are a senior product manager. You are part of an AI agent team building {project_name}.
+{f'Project: {description}' if description else ''}
+{f'Stack: {stack}' if stack else ''}
 
 Your job each iteration:
 1. Review the existing codebase and project context.
@@ -25,9 +39,12 @@ Rules:
 - Keep each iteration focused. Pick 2–4 concrete features max.
 - Always consider the existing code — don't redesign what already works.
 - Be specific about UX: page names, component names, user flows, form fields.
-- Think about a rental marketplace: listings, bookings, availability, payments, reviews, 
-  host/guest roles, search/filter, messaging.
-"""
+- User roles in this app: {user_roles}.
+{f'- Core domain entities: {entities}' if entities else ''}
+{f'- Key actions users perform: {key_actions}' if key_actions else ''}
+{f'- Constraints to keep in mind: {constraints}' if constraints else ''}
+""".strip()
+
 
 
 class ProductAgent(BaseAgent):
@@ -56,7 +73,7 @@ KEY FILES:
 {key_files}
 
 USER FEEDBACK FOR THIS ITERATION:
-{feedback or "No specific feedback — this is the first iteration. Analyse the codebase and propose the most valuable next features for a rental marketplace MVP."}
+{feedback or "No specific feedback — analyse the codebase and propose the most valuable next features to build."}
 
 ITERATION NUMBER: {iteration_number}
 
@@ -86,7 +103,7 @@ Based on all of the above, respond with a JSON object:
 }}
 """
 
-        result = self.call_json(SYSTEM_PROMPT, user_prompt, max_tokens=3000)
+        result = self.call_json(_build_system_prompt(context), user_prompt, max_tokens=3000)
 
         # Persist to context store
         context.add_decision("Product", result.get("iteration_goal", ""))

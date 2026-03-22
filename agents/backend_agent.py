@@ -1,7 +1,7 @@
 """
 Backend Agent
 =============
-Implements Next.js API routes, server actions, and business logic
+Implements API routes, server actions, and business logic
 based on features and schema from earlier agents.
 """
 
@@ -10,31 +10,56 @@ from agents.base_agent import BaseAgent
 from context.context_store import ContextStore
 
 
-SYSTEM_PROMPT = """
-You are a senior full-stack engineer specialising in Next.js 14+ (App Router),
-TypeScript, Supabase/PostgreSQL, and modern backend patterns.
+def _build_system_prompt(context: ContextStore) -> str:
+    cfg = context.get("project_config") or {}
+    project = context.get("project") or {}
+    backend_cfg = cfg.get("backend", {})
+    domain_cfg = cfg.get("domain", {})
 
-You are building the backend for a rental marketplace. Your job each iteration:
+    project_name = project.get("name", "the project")
+    description = project.get("description", "")
+    stack = project.get("stack", "Next.js, TypeScript, PostgreSQL")
+    db_client = backend_cfg.get("db_client", "the project's existing DB client")
+    auth = backend_cfg.get("auth", "the project's existing auth")
+    api_style = backend_cfg.get("api_style", "app-router")
+    entities = ", ".join(domain_cfg.get("entities", []))
+    key_actions = ", ".join(domain_cfg.get("key_actions", []))
+    constraints = "; ".join(domain_cfg.get("constraints", []))
+
+    api_note = (
+        "Use Next.js App Router conventions (app/api/... route handlers OR server actions)."
+        if api_style == "app-router"
+        else f"Use the project's {api_style} API conventions."
+    )
+
+    return f"""
+You are a senior full-stack engineer. You are building the backend for {project_name}.
+{f'Project: {description}' if description else ''}
+Stack: {stack}
+
+Your job each iteration:
 1. Review the planned features and database schema.
 2. Review the existing codebase.
 3. Write production-quality API routes, server actions, and utility functions.
 
 Rules:
-- Use Next.js App Router conventions (app/api/... route handlers OR server actions).
+- {api_note}
 - Use TypeScript throughout — no `any` types.
-- Validate inputs with Zod.
+- Validate all inputs with Zod.
 - Handle errors gracefully — always return typed responses.
-- Use Supabase client for database access (or the project's existing DB client).
+- Use {db_client} for database access.
+- Use {auth} for authentication — protect all routes that require it.
 - Never hardcode secrets — use environment variables.
 - Write complete files, not snippets. Every file should be immediately usable.
 - Include JSDoc comments on exported functions.
-- Think about auth: use Supabase Auth or the project's existing auth pattern.
-- For a rental marketplace: handle bookings, availability checks, listing CRUD,
-  user profiles, search/filter, payment intents, reviews, messages.
+{f'- Core domain entities: {entities}' if entities else ''}
+{f'- Key actions to support: {key_actions}' if key_actions else ''}
+{f'- Constraints to enforce: {constraints}' if constraints else ''}
 
 Output format: a JSON object where keys are file paths (relative to repo root)
 and values are the complete file content as strings.
-"""
+""".strip()
+
 
 
 class BackendAgent(BaseAgent):
@@ -84,7 +109,7 @@ Aim for 3–6 files per iteration. Write complete, production-quality TypeScript
 Focus on the features planned for this iteration — don't rewrite existing code.
 """
 
-        files = self.call_json(SYSTEM_PROMPT, user_prompt, max_tokens=4096)
+        files = self.call_json(_build_system_prompt(context), user_prompt, max_tokens=4096)
 
         context.add_decision("Backend", f"Implemented {len(files)} files: {', '.join(list(files.keys())[:5])}")
 
@@ -124,7 +149,7 @@ updated file content — the same format as the original implementation.
 Only include files that required changes; unchanged files can be omitted.
 """
 
-        revised = self.call_json(SYSTEM_PROMPT, user_prompt, max_tokens=4096)
+        revised = self.call_json(_build_system_prompt(context), user_prompt, max_tokens=4096)
 
         context.add_decision(
             "Backend",

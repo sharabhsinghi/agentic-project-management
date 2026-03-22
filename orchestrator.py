@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Rental Marketplace — AI Agent Orchestrator
-==========================================
+AI Agent Orchestrator
+=====================
 First-time setup (run once before any iteration):
     python orchestrator.py --repo /path/to/your/repo --init
 
@@ -25,11 +25,12 @@ from context.context_store import ContextStore
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Rental Marketplace AI Agent System")
-    parser.add_argument("--repo", required=True, help="Path to your local GitHub repo")
+    parser = argparse.ArgumentParser(description="AI Agent Orchestrator")
+    parser.add_argument("--repo", required=True, help="Path to your local repo")
     parser.add_argument("--init", action="store_true", help="Analyse the codebase and build base context (run once before first iteration)")
     parser.add_argument("--feedback", default="", help="Your feedback / instructions for this iteration")
     parser.add_argument("--context-file", default="context/project_context.json", help="Path to context store file")
+    parser.add_argument("--config", default="project_config.yaml", help="Path to project_config.yaml")
     parser.add_argument("--dry-run", action="store_true", help="Preview plan without writing files")
     args = parser.parse_args()
 
@@ -43,7 +44,7 @@ def main():
         print("❌  ANTHROPIC_API_KEY environment variable not set.")
         sys.exit(1)
 
-    print("\n🏠  Rental Marketplace Agent System")
+    print("\n🤖  AI Agent Orchestrator")
     print("=" * 50)
     print(f"📁  Repo: {repo_path}")
     if args.init:
@@ -52,7 +53,7 @@ def main():
         print(f"💬  Feedback: {args.feedback or '(none — agents will decide)'}")
     print(f"🕐  Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
 
-    context_store = ContextStore(args.context_file)
+    context_store = ContextStore(args.context_file, config_path=args.config)
     repo_tools = RepoTools(repo_path)
 
     orchestrator = OrchestratorAgent(

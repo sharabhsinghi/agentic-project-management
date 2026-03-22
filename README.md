@@ -1,24 +1,29 @@
-# 🏠 Rental Marketplace — AI Agent System
+# 🤖 AI Agent Orchestrator
 
-An iterative, human-in-the-loop AI agent pipeline for building your rental marketplace.
-Powered by Claude (Anthropic). Built for Next.js + PostgreSQL projects.
+An iterative, human-in-the-loop AI agent pipeline that plans, implements, reviews, and tests features in any web project.
+Powered by Claude (Anthropic).
 
 ## How it works
 
-Each time you run the orchestrator, five agents execute in sequence:
+Before the first iteration, an **Init Agent** analyses your codebase and builds a base context.
+Then, on each iteration, seven agents execute in sequence:
 
 ```
 Your Feedback
      ↓
-[Product Agent]   → Decides features & UX for this iteration
+[Init Agent]          → Analyses codebase, builds base context (runs once)
      ↓
-[Schema Agent]    → Designs/updates PostgreSQL schema
+[Product Agent]       → Decides features & UX for this iteration
      ↓
-[Backend Agent]   → Writes Next.js API routes & server actions
+[Schema Agent]        → Designs/updates the database schema
      ↓
-[Frontend Agent]  → Builds React components & pages
+[Backend Agent]       → Writes API routes & server actions
      ↓
-[QA Agent]        → Writes tests & flags security issues
+[Frontend Agent]      → Builds React components & pages
+     ↓
+[Code Review Agent]   → Reviews backend & frontend code, agents revise (once)
+     ↓
+[QA Agent]            → Writes tests & flags security issues
      ↓
 Files written to your repo
 ```
@@ -32,7 +37,6 @@ All decisions are stored in `context/project_context.json` so each iteration bui
 ### 1. Install dependencies
 
 ```bash
-cd rental-agent-system
 pip install -r requirements.txt
 ```
 
@@ -42,13 +46,49 @@ pip install -r requirements.txt
 export ANTHROPIC_API_KEY=sk-ant-...
 ```
 
-### 3. Run your first iteration
+### 3. Configure your project
 
-```bash
-python orchestrator.py --repo /path/to/your/nextjs/project
+Edit `project_config.yaml` to describe your project before running anything:
+
+```yaml
+project:
+  name: "My App"
+  description: "A web application that ..."
+  stack: "Next.js 14, TypeScript, Supabase, Tailwind CSS"
+  user_roles:
+    - "user"
+    - "admin"
+
+domain:
+  entities: ["user", "item", "order"]
+  key_actions: ["create item", "place order", "track status"]
+  constraints:
+    - "Users can only modify their own data"
+
+backend:
+  db_client: "supabase"      # supabase | prisma | drizzle | raw-sql
+  auth: "supabase-auth"      # supabase-auth | next-auth | clerk | custom
+  api_style: "app-router"    # app-router | pages-router
+
+frontend:
+  ui_library: "Tailwind CSS"
+  component_library: "shadcn/ui"   # or "none"
+  data_fetching: "server-components"
 ```
 
-That's it. The agents will scan your codebase and propose the most logical next features.
+### 4. Initialise (run once)
+
+```bash
+python orchestrator.py --repo /path/to/your/project --init
+```
+
+This scans your codebase, combines it with your config, and saves the base context.
+
+### 5. Run your first iteration
+
+```bash
+python orchestrator.py --repo /path/to/your/project
+```
 
 ---
 
@@ -58,15 +98,15 @@ After reviewing the output and testing manually, give feedback:
 
 ```bash
 python orchestrator.py \
-  --repo /path/to/your/nextjs/project \
-  --feedback "The listing page looks good but the booking form needs a date range picker, and we're missing availability blocking when a booking is confirmed."
+  --repo /path/to/your/project \
+  --feedback "The list page looks good but the form needs a date picker, and we're missing validation on the API."
 ```
 
 Your feedback can be anything:
-- Bug reports: `"The price calculation doesn't account for the cleaning fee"`
-- New features: `"Add a messaging system between hosts and guests"`
-- UX changes: `"The search filters need to include pet-friendly and pool options"`
-- Refactors: `"The auth logic is duplicated in 3 routes, consolidate it"`
+- Bug reports: `"The price calculation is off when a discount is applied"`
+- New features: `"Add a messaging system between users"`
+- UX changes: `"The search filters need additional options"`
+- Refactors: `"The auth logic is duplicated across 3 routes, consolidate it"`
 
 ---
 
@@ -77,7 +117,7 @@ After each iteration, you'll find:
 | Path | What it is |
 |------|-----------|
 | `migrations/001_iteration_1.sql` | SQL migration to run against your DB |
-| `migrations/001_prisma_additions.prisma` | Prisma models to add to your schema.prisma |
+| `migrations/001_prisma_additions.prisma` | Prisma models to add to schema.prisma |
 | `app/api/.../route.ts` | New API routes |
 | `app/.../page.tsx` | New pages |
 | `components/...` | New components |
@@ -91,15 +131,18 @@ After each iteration, you'll find:
 ## Recommended workflow
 
 ```
-Iteration N:
+Step 0 (once):
+  1. Edit project_config.yaml
+  2. python orchestrator.py --repo . --init
+
+Each iteration:
   1. python orchestrator.py --repo . --feedback "..."
-  2. Review the files in your editor
-  3. Apply the SQL migration
-  4. Update prisma/schema.prisma
-  5. Run: npm run dev
-  6. Test the new features manually
-  7. Fix anything obvious yourself
-  8. Go to Iteration N+1
+  2. Review the generated files in your editor
+  3. Apply the SQL migration to your database
+  4. Update prisma/schema.prisma (if using Prisma)
+  5. Run your dev server and test manually
+  6. Fix anything obvious yourself
+  7. Repeat
 ```
 
 ---
@@ -108,9 +151,11 @@ Iteration N:
 
 | Flag | Description |
 |------|-------------|
-| `--repo` | Path to your Next.js repo (required) |
-| `--feedback` | Your feedback for this iteration (optional on first run) |
-| `--context-file` | Path to context JSON (default: context/project_context.json) |
+| `--repo` | Path to your repo (required) |
+| `--init` | Run the one-time initialisation pass |
+| `--feedback` | Your feedback for this iteration |
+| `--config` | Path to project config (default: `project_config.yaml`) |
+| `--context-file` | Path to context JSON (default: `context/project_context.json`) |
 | `--dry-run` | Preview the plan without writing any files |
 
 ---
@@ -130,16 +175,19 @@ Iteration N:
 ## Project structure
 
 ```
-rental-agent-system/
-├── orchestrator.py          ← Entry point — run this
+agent-system/
+├── orchestrator.py             ← Entry point — run this
+├── project_config.yaml         ← Your project description (edit before --init)
 ├── requirements.txt
 ├── README.md
 ├── agents/
 │   ├── orchestrator_agent.py   ← Coordinates the pipeline
+│   ├── init_agent.py           ← One-time codebase analysis
 │   ├── product_agent.py        ← Features & UX planning
-│   ├── schema_agent.py         ← PostgreSQL schema design
+│   ├── schema_agent.py         ← Database schema design
 │   ├── backend_agent.py        ← API routes & server logic
 │   ├── frontend_agent.py       ← React components & pages
+│   ├── code_review_agent.py    ← Code review & one-shot revision
 │   └── qa_agent.py             ← Tests & security review
 ├── tools/
 │   └── repo_tools.py           ← Reads & writes your repo
@@ -147,3 +195,4 @@ rental-agent-system/
     ├── context_store.py        ← Persistent memory layer
     └── project_context.json    ← Auto-generated, commit this
 ```
+

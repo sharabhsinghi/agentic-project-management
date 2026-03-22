@@ -13,15 +13,30 @@ from agents.base_agent import BaseAgent
 from context.context_store import ContextStore
 
 
-SYSTEM_PROMPT = """
+def _build_system_prompt(context: ContextStore) -> str:
+    project = context.get("project") or {}
+    cfg = context.get("project_config") or {}
+    backend_cfg = cfg.get("backend", {})
+
+    project_name = project.get("name", "the project")
+    stack = project.get("stack", "")
+    db_client = backend_cfg.get("db_client", "")
+
+    supabase_note = (
+        "  missing Supabase RLS considerations,"
+        if "supabase" in db_client.lower()
+        else ""
+    )
+    stack_line = f"You are reviewing code for {project_name}." + (f" Stack: {stack}." if stack else "")
+
+    return f"""
 You are a senior software engineer and technical lead conducting a thorough code review.
-You are reviewing code written for a Next.js rental marketplace (Next.js 14+ App Router,
-TypeScript, Tailwind CSS, Supabase/PostgreSQL).
+{stack_line}
 
 Review each file against these criteria:
 - Correctness: logic errors, unhandled edge cases, incorrect API or framework usage
 - Security: missing auth checks, unvalidated input reaching the DB, XSS/injection risks,
-  exposed secrets or tokens, missing Supabase RLS considerations
+  exposed secrets or tokens{supabase_note}
 - TypeScript strictness: no `any` types, proper return types on exported functions
 - Code quality: duplicated logic, overly complex or unreadable sections
 - Consistency: does the new code follow patterns visible in the existing codebase?
@@ -32,7 +47,7 @@ Review each file against these criteria:
 
 Focus only on real, actionable issues — not stylistic preferences.
 Be concise and specific: reference the file and the exact function or section.
-"""
+""".strip()
 
 
 class CodeReviewAgent(BaseAgent):
@@ -111,7 +126,7 @@ Rules:
 - Each issue string must identify the specific function, block, or line range involved.
 """
 
-        result = self.call_json(SYSTEM_PROMPT, user_prompt, max_tokens=4096)
+        result = self.call_json(_build_system_prompt(context), user_prompt, max_tokens=4096)
 
         backend_issues = len(result.get("backend_feedback", []))
         frontend_issues = len(result.get("frontend_feedback", []))

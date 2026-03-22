@@ -2,7 +2,7 @@
 QA & Security Agent
 ===================
 Reviews the code produced this iteration and writes tests.
-Also flags security concerns for the rental marketplace context.
+Also flags security concerns relevant to the project.
 """
 
 import json
@@ -10,37 +10,61 @@ from agents.base_agent import BaseAgent
 from context.context_store import ContextStore
 
 
-SYSTEM_PROMPT = """
-You are a senior QA engineer and security reviewer specialising in Next.js,
-TypeScript, and PostgreSQL applications — specifically rental marketplace apps.
+def _build_system_prompt(context: ContextStore) -> str:
+    cfg = context.get("project_config") or {}
+    project = context.get("project") or {}
+    backend_cfg = cfg.get("backend", {})
+    domain_cfg = cfg.get("domain", {})
+    project_cfg = cfg.get("project", {})
+
+    project_name = project.get("name", "the project")
+    description = project.get("description", "")
+    db_client = backend_cfg.get("db_client", "postgresql")
+    auth = backend_cfg.get("auth", "the project's auth")
+    user_roles = ", ".join(project_cfg.get("user_roles", ["user"]))
+    constraints = "; ".join(domain_cfg.get("constraints", []))
+    key_actions = ", ".join(domain_cfg.get("key_actions", []))
+
+    supabase_note = (
+        "- Verify Supabase RLS policies exist for all tables with user-scoped data."
+        if "supabase" in db_client.lower()
+        else ""
+    )
+
+    return f"""
+You are a senior QA engineer and security reviewer.
+You are reviewing code for {project_name}.
+{f'Project: {description}' if description else ''}
+User roles: {user_roles}
 
 Your job each iteration:
 1. Review the backend and frontend code produced.
 2. Write meaningful tests (unit + integration where possible).
-3. Flag any security issues specific to a rental marketplace.
+3. Flag any security issues.
 
 Testing rules:
 - Use Jest + React Testing Library for component tests.
 - Use Jest for API route/utility unit tests.
-- Write tests that actually test behaviour, not implementation details.
+- Write tests that test behaviour, not implementation details.
 - Cover happy paths AND error cases.
-- Mock Supabase/DB calls appropriately.
+- Mock DB/external calls appropriately.
 
-Security checklist for rental marketplaces:
-- Auth on every protected route/action (guests can't modify other users' listings)
-- Input validation (SQL injection, XSS, price manipulation)
-- Booking race conditions (double-booking prevention)
-- File upload safety (listing images)
-- Payment amount validation (never trust client-side prices)
-- Rate limiting on search/booking endpoints
-- PII handling (guest data, host contact info)
-- RLS policies in Supabase
+Security checklist:
+- Auth required on every protected route/action (users can only access their own data).
+- Input validation against injection, XSS, and price/value manipulation.
+- No secrets or tokens in client-side code.
+- Rate limiting on high-volume endpoints.
+- PII handling: sensitive data must not leak across user boundaries.
+{f'- Constraints to verify: {constraints}' if constraints else ''}
+{f'- Critical user actions to test: {key_actions}' if key_actions else ''}
+{supabase_note}
 
 Output format: a JSON object with:
-- "test_files": { filepath: content } — test files to write
-- "security_issues": [ { severity, location, description, recommendation } ]
+- "test_files": {{ filepath: content }} — test files to write
+- "security_issues": [ {{ severity, location, description, recommendation }} ]
 - "qa_notes": "Summary of what was tested and any gaps"
-"""
+""".strip()
+
 
 
 class QAAgent(BaseAgent):
@@ -78,7 +102,7 @@ CODE TO REVIEW AND TEST:
 Write tests for the most critical paths and flag any security issues.
 """
 
-        result = self.call_json(SYSTEM_PROMPT, user_prompt, max_tokens=4096)
+        result = self.call_json(_build_system_prompt(context), user_prompt, max_tokens=4096)
 
         # Log security issues
         issues = result.get("security_issues", [])

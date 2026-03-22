@@ -11,21 +11,47 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+try:
+    import yaml
+except ImportError:
+    yaml = None  # graceful fallback if PyYAML not installed
+
+# Default location of the project config, relative to cwd
+DEFAULT_CONFIG_PATH = "project_config.yaml"
+
 
 class ContextStore:
-    def __init__(self, path: str = "context/project_context.json"):
+    def __init__(self, path: str = "context/project_context.json",
+                 config_path: str = DEFAULT_CONFIG_PATH):
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        self._config = self._load_config(config_path)
         self._data = self._load()
+
+    def _load_config(self, config_path: str) -> dict:
+        """Load project_config.yaml if present, else return empty dict."""
+        p = Path(config_path)
+        if p.exists() and yaml is not None:
+            with open(p) as f:
+                return yaml.safe_load(f) or {}
+        return {}
+
+    @property
+    def project_config(self) -> dict:
+        """The raw project_config.yaml contents for agents to use."""
+        return self._config
 
     def _load(self) -> dict:
         if self.path.exists():
             with open(self.path) as f:
                 return json.load(f)
+        # Seed defaults from config if available
+        project_cfg = self._config.get("project", {})
         return {
             "project": {
-                "name": "Rental Marketplace",
-                "stack": "Next.js + PostgreSQL",
+                "name": project_cfg.get("name", "My Project"),
+                "stack": project_cfg.get("stack", ""),
+                "description": project_cfg.get("description", ""),
                 "created_at": datetime.now().isoformat(),
             },
             "iterations": [],
@@ -93,6 +119,7 @@ class ContextStore:
         schema = self._data.get("schema", {})
         decisions = self._data.get("decisions", [])[-10:]  # last 10
         iteration = self._data.get("current_iteration", 0)
+        project = self._data.get("project", {})
 
         feature_list = "\n".join(
             f"  - [{f.get('status','planned')}] {f.get('name','')}: {f.get('description','')}"
@@ -105,6 +132,10 @@ class ContextStore:
 
         return f"""
 === PROJECT CONTEXT (Iteration {iteration}) ===
+
+PROJECT: {project.get('name', '')}
+DESCRIPTION: {project.get('description', '')}
+STACK: {project.get('stack', '')}
 
 FEATURES:
 {feature_list or '  (none yet)'}

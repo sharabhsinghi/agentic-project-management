@@ -46,14 +46,38 @@ class InitAgent(BaseAgent):
         """
         print("\n🔎  [Init Agent] Analysing codebase to build base context...")
 
+        # Pull user-supplied config so the LLM can confirm / enrich it
+        cfg = context.project_config
+        project_cfg = cfg.get("project", {})
+        domain_cfg = cfg.get("domain", {})
+        backend_cfg = cfg.get("backend", {})
+        frontend_cfg = cfg.get("frontend", {})
+
+        config_hint = f"""
+USER-PROVIDED PROJECT CONFIG (treat as ground truth; enrich with what you see in the code):
+  name:            {project_cfg.get('name', '(not set)')}
+  description:     {project_cfg.get('description', '(not set)')}
+  stack:           {project_cfg.get('stack', '(not set)')}
+  user_roles:      {', '.join(project_cfg.get('user_roles', []))}
+  domain entities: {', '.join(domain_cfg.get('entities', []))}
+  key actions:     {', '.join(domain_cfg.get('key_actions', []))}
+  constraints:     {'; '.join(domain_cfg.get('constraints', []))}
+  db_client:       {backend_cfg.get('db_client', '(not set)')}
+  auth:            {backend_cfg.get('auth', '(not set)')}
+  api_style:       {backend_cfg.get('api_style', '(not set)')}
+  ui_library:      {frontend_cfg.get('ui_library', '(not set)')}
+  component_lib:   {frontend_cfg.get('component_library', '(not set)')}
+  data_fetching:   {frontend_cfg.get('data_fetching', '(not set)')}
+""".strip()
+
         user_prompt = f"""
 Analyse the following codebase and return a JSON object with this exact structure:
 
 {{
   "project": {{
-    "name": "<project or app name, inferred from package.json or README>",
+    "name": "<project or app name — use the config value unless code clearly contradicts it>",
     "description": "<one-sentence description of what the app does>",
-    "stack": "<comma-separated list of key technologies, e.g. Next.js 14, TypeScript, Supabase, Tailwind CSS, Prisma>"
+    "stack": "<comma-separated list of key technologies actually found in the code>"
   }},
   "existing_schema": {{
     "summary": "<plain-English summary of the database structure>",
@@ -82,6 +106,8 @@ Analyse the following codebase and return a JSON object with this exact structur
 If a section has no information (e.g. no DB schema found), use an empty list [] or
 an empty string "" rather than omitting the key.
 
+{config_hint}
+
 REPO STRUCTURE:
 {repo_structure}
 
@@ -91,15 +117,16 @@ KEY FILES:
 
         analysis = self.call_json(SYSTEM_PROMPT, user_prompt, max_tokens=4096)
 
-        # Persist to context store
+        # Persist to context store — config values are the baseline; code analysis enriches
         project_info = analysis.get("project", {})
-        if project_info:
-            context.set("project", {
-                **context.get("project", {}),
-                "name": project_info.get("name", "Rental Marketplace"),
-                "description": project_info.get("description", ""),
-                "stack": project_info.get("stack", ""),
-            })
+        context.set("project", {
+            **context.get("project", {}),
+            "name": project_info.get("name", project_cfg.get("name", "My Project")),
+            "description": project_info.get("description", project_cfg.get("description", "")),
+            "stack": project_info.get("stack", project_cfg.get("stack", "")),
+        })
+        # Also persist the full raw config for agents to reference
+        context.set("project_config", cfg)
 
         existing_schema = analysis.get("existing_schema", {})
         if existing_schema:
