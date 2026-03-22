@@ -5,7 +5,6 @@ Reads the codebase to give agents context, and writes output files back.
 """
 
 import os
-import subprocess
 from pathlib import Path
 from typing import Optional
 
@@ -106,18 +105,6 @@ class RepoTools:
             if self.write_file(path, content):
                 written.append(path)
         return written
-
-    def get_git_status(self) -> str:
-        """Returns git status of the repo."""
-        try:
-            result = subprocess.run(
-                ["git", "status", "--short"],
-                cwd=self.repo_path,
-                capture_output=True, text=True,
-            )
-            return result.stdout or "(clean)"
-        except Exception:
-            return "(git not available)"
 
     def _read_file(self, path: Path) -> str:
         try:
