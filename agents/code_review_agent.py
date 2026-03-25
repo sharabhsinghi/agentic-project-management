@@ -47,6 +47,7 @@ Review each file against these criteria:
 
 Focus only on real, actionable issues — not stylistic preferences.
 Be concise and specific: reference the file and the exact function or section.
+- IMPORTANT: Your entire JSON response must fit within 4096 tokens. Be concise. Do not pad or repeat content.
 """.strip()
 
 

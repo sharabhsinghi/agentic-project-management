@@ -26,6 +26,7 @@ Be accurate and concise. Only describe what is genuinely present in the code —
 do not invent or assume features that are not clearly visible.
 
 You must respond with a single JSON object — no prose, no markdown fences.
+IMPORTANT: Your entire JSON response must fit within 4096 tokens. Be concise. Do not pad or repeat content.
 """
 
 

@@ -58,6 +58,7 @@ Rules:
 
 Output format: a JSON object where keys are file paths (relative to repo root)
 and values are the complete file content as strings.
+- IMPORTANT: Your entire JSON response must fit within 4096 tokens. Be concise; omit boilerplate comments. Do not pad or repeat content.
 """.strip()
 
 

@@ -43,6 +43,7 @@ Rules:
 {f'- Core domain entities: {entities}' if entities else ''}
 {f'- Key actions users perform: {key_actions}' if key_actions else ''}
 {f'- Constraints to keep in mind: {constraints}' if constraints else ''}
+- IMPORTANT: Your entire JSON response must fit within 3000 tokens. Be concise. Do not pad or repeat content.
 """.strip()
 
 

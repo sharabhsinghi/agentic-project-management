@@ -55,6 +55,7 @@ Rules:
 {f'- Constraints to enforce at DB level: {constraints}' if constraints else ''}
 {supabase_note}
 {prisma_note}
+- IMPORTANT: Your entire JSON response must fit within 4096 tokens. Be concise in comments and descriptions. Do not pad or repeat content.
 """.strip()
 
 

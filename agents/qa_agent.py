@@ -63,6 +63,7 @@ Output format: a JSON object with:
 - "test_files": {{ filepath: content }} — test files to write
 - "security_issues": [ {{ severity, location, description, recommendation }} ]
 - "qa_notes": "Summary of what was tested and any gaps"
+- IMPORTANT: Your entire JSON response must fit within 4096 tokens. Be concise; omit boilerplate. Do not pad or repeat content.
 """.strip()
 
 

@@ -54,5 +54,55 @@ class BaseAgent:
             return json.loads(cleaned)
         except json.JSONDecodeError as e:
             print(f"  ⚠️  [{self.name}] JSON parse error: {e}")
-            print(f"  Raw response: {raw[:500]}")
+            print(f"  Raw response (first 500 chars): {raw[:500]}")
+            # Response may be truncated due to token limits — attempt recovery
+            recovered = self._recover_truncated_json(cleaned)
+            if recovered is not None:
+                print(f"  🔧  [{self.name}] Recovered truncated JSON response.")
+                return recovered
             raise
+
+    def _recover_truncated_json(self, text: str) -> dict | list | None:
+        """Attempt to recover a truncated JSON object by trimming to the last complete key."""
+        # Walk backwards through the text to find the last position where JSON is valid
+        # Strategy: remove the last incomplete key-value pair by finding the last comma
+        # at the top level and closing the object/array there.
+        depth_map = {'{': '}', '[': ']'}
+        close_map = {'}': '{', ']': '['}
+        stack = []
+        in_string = False
+        escape_next = False
+        last_top_level_comma = -1
+        first_open = None
+
+        for i, ch in enumerate(text):
+            if escape_next:
+                escape_next = False
+                continue
+            if ch == '\\' and in_string:
+                escape_next = True
+                continue
+            if ch == '"':
+                in_string = not in_string
+                continue
+            if in_string:
+                continue
+            if ch in depth_map:
+                if first_open is None:
+                    first_open = ch
+                stack.append(ch)
+            elif ch in close_map:
+                if stack and stack[-1] == close_map[ch]:
+                    stack.pop()
+            elif ch == ',' and len(stack) == 1:
+                last_top_level_comma = i
+
+        if first_open is None or last_top_level_comma == -1:
+            return None
+
+        closer = depth_map[first_open]
+        truncated = text[:last_top_level_comma] + closer
+        try:
+            return json.loads(truncated)
+        except json.JSONDecodeError:
+            return None
